@@ -6,11 +6,12 @@ from .service import UserService
 from .utils import verify_password, create_access_token, decode_token
 from src.db.main import get_session
 from src.db.redis import jti_to_blocklist
-from .dependecies import RefreshTokenBearer, AccessTokenBearer
+from .dependecies import RefreshTokenBearer, AccessTokenBearer, get_current_user, RoleChecker
 from datetime import timedelta, datetime
 
 auth_router = APIRouter()
 user_service = UserService()
+role_checker = RoleChecker(['admin', 'user'])
 
 
 @auth_router.post('/signup', status_code=status.HTTP_201_CREATED, response_model=UserModel)
@@ -35,8 +36,8 @@ async def login_access(login_data:UserLoginmodel, session:AsyncSession=Depends(g
     if user is not None:
         passwd_valid = verify_password(password, user.password_hash)
         if passwd_valid:
-            access_token = create_access_token(user_data={'email':user.email, 'uid':str(user.uid)})
-            refresh_token = create_access_token(user_data={'email':user.email, 'uid':str(user.uid)},expiry=timedelta(days=2), refresh=True)
+            access_token = create_access_token(user_data={'email':user.email, 'uid':str(user.uid), 'role':user.role})
+            refresh_token = create_access_token(user_data={'email':user.email, 'uid':str(user.uid), 'role':user.role},expiry=timedelta(days=2), refresh=True)
 
             return JSONResponse(content={
                 'message':'login successful',
@@ -59,6 +60,10 @@ async def get_new_access_token(token_details:dict=Depends(RefreshTokenBearer()))
         return JSONResponse(content={'access_token':new_access_token})
     
     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='invalid or expired token')
+
+@auth_router.get('/me', response_model=UserModel)
+async def get_current_user(user = Depends(get_current_user), _:bool=Depends(role_checker)):
+    return user
 
 @auth_router.get('/logout')
 async def logout(token_details:dict=Depends(AccessTokenBearer())):

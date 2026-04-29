@@ -18,8 +18,7 @@ version = 'v1'
 app = FastAPI(
     title='bookly',
     description='a REST API for book review web service',
-    version=version,
-    lifespan=lifespan
+    version=version
 )
 
 app.add_middleware(
