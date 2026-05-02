@@ -6,6 +6,7 @@ from .utils import decode_token
 from .service import UserService
 from src.db.redis import token_in_blocklist
 from src.db.main import get_session
+from src.errors import InvalidToken, AccessTokenRequired, RefreshTokenRequired, InsufficientPermission
 
 user_service = UserService()
 
@@ -21,10 +22,10 @@ class TokenBearer(HTTPBearer):
         token_data = decode_token(token)
 
         if not self.token_valid(token):
-            raise HTTPException(status_code=403, detail={'error':'invalid token or expired', 'resolution':'get new token'})
+            raise InvalidToken()
 
         if await token_in_blocklist(token_data['jti']):
-            raise HTTPException(status_code=403, detail={'error':'invalid token or expired', 'resolution':'get new token'})
+            raise InvalidToken()
 
         if not token_data:
             raise HTTPException(status_code=403, detail="invalid token")
@@ -44,12 +45,12 @@ class TokenBearer(HTTPBearer):
 class AccessTokenBearer(TokenBearer):
     def verify_token(self, token_data:dict):
         if token_data and token_data['refresh']:
-            raise HTTPException(status_code=403, detail="please provide access token")
+            raise AccessTokenRequired()
         
 class RefreshTokenBearer(TokenBearer):
     def verify_token(self, token_data):
         if token_data and not token_data['refresh']:
-            raise HTTPException(status_code=403, detail="please provide refresh token")
+            raise RefreshTokenRequired()
         
 async def get_current_user(token_details:dict=Depends(AccessTokenBearer()), session:AsyncSession=Depends(get_session)):
      user_email = token_details['user']['email']
@@ -65,4 +66,4 @@ class RoleChecker:
         if current_user.role in self.allowed_roles:
             return True
         
-        raise HTTPException(status_code=403, detail="you don't have permission to perform this action")
+        raise InsufficientPermission()

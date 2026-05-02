@@ -6,13 +6,14 @@ from .service import UserService
 from .utils import verify_password, create_access_token, decode_token
 from src.db.main import get_session
 from src.db.redis import jti_to_blocklist
-from .dependecies import (
+from .dependencies import (
     RefreshTokenBearer,
     AccessTokenBearer,
     get_current_user,
     RoleChecker,
 )
 from datetime import timedelta, datetime
+from src.errors import UserAlreadyExist, InvalidCredentials, InvalidToken
 
 auth_router = APIRouter()
 user_service = UserService()
@@ -29,9 +30,7 @@ async def create_user_account(
     user_exist = await user_service.user_exist(email, session)
 
     if user_exist:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="user already exist"
-        )
+        raise UserAlreadyExist()
 
     new_user = await user_service.create_user(user_data, session)
 
@@ -72,9 +71,7 @@ async def login_access(
                 }
             )
 
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid email or password"
-    )
+    raise InvalidCredentials()
 
 
 @auth_router.get("/refresh_token")
@@ -85,9 +82,7 @@ async def get_new_access_token(token_details: dict = Depends(RefreshTokenBearer(
         new_access_token = create_access_token(token_details["user"])
         return JSONResponse(content={"access_token": new_access_token})
 
-    raise HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST, detail="invalid or expired token"
-    )
+    raise InvalidToken()
 
 
 @auth_router.get("/me", response_model=UserBooksModel)
