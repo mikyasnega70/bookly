@@ -1,7 +1,7 @@
 from fastapi import APIRouter, status, HTTPException, Depends
 from fastapi.responses import JSONResponse
 from sqlmodel.ext.asyncio.session import AsyncSession
-from .schemas import UserCreatemodel, UserModel, UserLoginmodel, UserBooksModel
+from .schemas import UserCreatemodel, UserModel, UserLoginmodel, UserBooksModel, EmailModel
 from .service import UserService
 from .utils import verify_password, create_access_token, decode_token
 from src.db.main import get_session
@@ -14,11 +14,22 @@ from .dependencies import (
 )
 from datetime import timedelta, datetime
 from src.errors import UserAlreadyExist, InvalidCredentials, InvalidToken
+from src.mail import mail, create_mail
 
 auth_router = APIRouter()
 user_service = UserService()
 role_checker = RoleChecker(["admin", "user"])
 
+
+@auth_router.post('/send_mail')
+async def send_mail(emails:EmailModel):
+    emails = emails.addresses
+
+    html = "<h1>Welcome</h1>"
+    message = create_mail(recipients=emails, subject="welcome", body=html)
+    await mail.send_message(message)
+
+    return {"message":"email sent successfully"}
 
 @auth_router.post(
     "/signup", status_code=status.HTTP_201_CREATED, response_model=UserModel
